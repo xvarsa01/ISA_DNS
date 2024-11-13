@@ -1,0 +1,6 @@
+# Ignore compiled files
+*.o
+*.out
+*.exe
+
+dns-monitor
