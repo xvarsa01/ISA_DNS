@@ -232,7 +232,9 @@ int print_domain_name(const u_char *data, const u_char *original_dns_pointer, in
             }
 
             for (size_t i = 0; i < name_length; i++) {
-                printf("%c", *data);
+                if(verbose){
+                    printf("%c", *data);
+                }
                 if (fp != NULL){
                     fprintf(fp, "%c", *data);
                 }
@@ -242,7 +244,9 @@ int print_domain_name(const u_char *data, const u_char *original_dns_pointer, in
                     data_printed_size++;
                 }
             }
-            printf(".");
+            if (verbose){
+                printf(".");
+            }
             if (fp != NULL){
                 fprintf(fp, ".");
             }
@@ -318,20 +322,17 @@ const u_char * print_DNS_question(const u_char *data,  const u_char *original_dn
     
     data += print_domain_name_setup(data, original_dns_pointer);
 
-    uint16_t qtype = ntohs(*((uint16_t*)data));
-    data+=2;
-
-    uint16_t qclass = ntohs(*((uint16_t*)data));
-    data+=2;
-
-    print_CLASS_and_TYPE(qclass, qtype);
-    
-    printf("\n\n");
+    if(verbose){
+        uint16_t qtype = ntohs(*((uint16_t*)data));
+        uint16_t qclass = ntohs(*((uint16_t*)(data + 2)));
+        print_CLASS_and_TYPE(qclass, qtype);
+        printf("\n\n");
+    }
+    data+=4;
     return data;
 }
 
 const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_pointer, int count){
-    // printf("count: %d\n", count);
     for (int i = 0; i < count; i++) {
         
         data += print_domain_name_setup(data, original_dns_pointer);
@@ -340,105 +341,51 @@ const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_p
         uint16_t qclass = ntohs(*((uint16_t*)(data + 2)));
         uint32_t ttl = ntohs(*((uint16_t*)(data + 4)));
         uint16_t rd_length = ntohs(*((uint16_t*)(data + 8)));
-
         data+=10;
         
-        printf(" %d", ttl);
-        print_CLASS_and_TYPE(qclass, qtype);
-        printf(" ");
-        
-        switch (qtype){
-            case 1:                            //A
-                printf("%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
-                data+=4;
-                break;
-            case 2:                             // NS
-                data += print_domain_name_setup(data, original_dns_pointer);
-                break;
-            case 5:                             // CNAME
-                data += print_domain_name_setup(data, original_dns_pointer);
-                break;
-            case 15:
-                printf("MX");
-                break;
-            case 6:
-                data = print_SOA(data, original_dns_pointer);
-                break;
-            case 28:                            //AAAA
-                print_ipv6_address(data);
-                data+=16;
-                break;
-            case 33:
-                printf("SRV");
-                break;
-            default:
-                printf("unknown");
-
-            puts("");
+        if (verbose){
+            printf(" %d", ttl);
+            print_CLASS_and_TYPE(qclass, qtype);
+            printf(" ");
+            switch (qtype){
+                case 1:                            //A
+                    printf("%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
+                    break;
+                case 2:                             // NS
+                    print_domain_name_setup(data, original_dns_pointer);
+                    break;
+                case 5:                             // CNAME
+                    print_domain_name_setup(data, original_dns_pointer);
+                    break;
+                case 15:
+                    printf("MX");
+                    break;
+                case 6:
+                    print_SOA(data, original_dns_pointer);
+                    break;
+                case 28:                            //AAAA
+                    print_ipv6_address(data);
+                    break;
+                case 33:
+                    printf("SRV");
+                    break;
+                default:
+                    printf("unknown");
+            }
+            printf("\n");
         }
+        data += rd_length;
+
         // printf("\nnext data:");
         // const u_char *data2 = data;
         // for (size_t i = 0; i < 5; i++){
         //     printf("  0x%02X", *data2);
         //     data2++;
         // }
+    }
+    if (verbose){
         printf("\n");
-    }   
-    
-
-    printf("\n");
-    return data;
-}
-
-const u_char * print_DNS_authority(const u_char *data, const u_char *original_dns_pointer, int count){
-    // printf("count: %d\n", count);
-    for (int i = 0; i < count; i++) {
-        
-        data += print_domain_name_setup(data, original_dns_pointer);
-
-        uint16_t qtype = ntohs(*((uint16_t*)(data + 0)));
-        uint16_t qclass = ntohs(*((uint16_t*)(data + 2)));
-        uint32_t ttl = ntohs(*((uint16_t*)(data + 4)));
-        uint16_t rd_length = ntohs(*((uint16_t*)(data + 8)));
-
-        data+=10;
-        
-        printf(" %d", ttl);
-        print_CLASS_and_TYPE(qclass, qtype);
-        printf(" ");
-        
-        switch (qtype){
-            case 1:                            //A
-                printf("%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
-                data+=4;
-                break;
-            case 2:                             // NS
-                data += print_domain_name_setup(data, original_dns_pointer);
-                break;
-            case 5:                             // CNAME
-                data += print_domain_name_setup(data, original_dns_pointer);
-                break;
-            case 15:
-                printf("MX");
-                break;
-            case 6:                             // SOA
-                data = print_SOA(data, original_dns_pointer);
-                break;
-            case 28:                            //AAAA
-                print_ipv6_address(data);
-                data+=16;
-                break;
-            case 33:
-                printf("SRV");
-                break;
-            default:
-                printf("unknown");
-
-            puts("");
-        }
-        printf("\n");
-    }   
-    printf("\n");
+    }
     return data;
 }
 
@@ -482,29 +429,36 @@ void print_DNS_data(const u_char *data, int len) {
 
     if (verbose){
         printf("Identifier: 0x%04X\n", header.id);
-        printf("Flags: QR=%d, OPCODE=%d, AA=%d, TC=%d, RD=%d, RA=%d, AD=%d, CD=%d, RCODE=%d\n\n", flag_QR, flag_OPCODE, flag_AA, flag_TC, flag_RD, flag_RA, flag_AD, flag_CD, flag_RCODE);
-
-        if (header.qdcount != 0){
-            printf("[Question Section]\n");
-            data = print_DNS_question(data, original_dns_pointer);
-        }        
-        if (header.ancount != 0){
-            printf("[Answer Section]\n");
-            data = print_DNS_answer(data, original_dns_pointer, header.ancount);
-        }
-        if (header.nscount != 0){
-            printf("[Authority Section]\n");
-            data = print_DNS_authority(data, original_dns_pointer, header.nscount);
-        }
-        if (header.arcount != 0){
-            printf("[Additional Section]\n0x%04X\n\n", header.arcount);
-        }
-        
+        printf("Flags: QR=%d, OPCODE=%d, AA=%d, TC=%d, RD=%d, RA=%d, AD=%d, CD=%d, RCODE=%d\n\n", flag_QR, flag_OPCODE, flag_AA, flag_TC, flag_RD, flag_RA, flag_AD, flag_CD, flag_RCODE);        
     }
     else{
         printf("(%s %d/%d/%d/%d)\n", flag_QR ? "R" : "Q", header.qdcount, header.ancount, header.nscount, header.arcount);
     }
-    puts("");
+    
+    if (header.qdcount != 0){
+        if (verbose){
+            printf("[Question Section]\n");
+        }
+        data = print_DNS_question(data, original_dns_pointer);
+    }        
+    if (header.ancount != 0){
+        if (verbose){
+            printf("[Answer Section]\n");
+        }
+        data = print_DNS_answer(data, original_dns_pointer, header.ancount);
+    }
+    if (header.nscount != 0){
+        if (verbose){
+            printf("[Authority Section]\n");
+        }
+        data = print_DNS_answer(data, original_dns_pointer, header.nscount);
+    }
+    if (header.arcount != 0){
+        if (verbose){
+            printf("[Additional  Section]\n");
+        }        
+        data = print_DNS_answer(data, original_dns_pointer, header.arcount);
+    }
 }
 
 /*
@@ -545,7 +499,6 @@ pcap_t* create_pcap_handle(char* device, char* filter){
 
     return handle;
 }
-
 
 /*
     callback function that is used for printing ipv4 / ipv6 metadata..
@@ -655,11 +608,11 @@ int main(int argc, char *argv[]){
 
     process_args(argc, argv, &interface, &pcapfile, &domainsfile, &translationsfile, &verbose);
 
-    printf("interface: %s\n", interface);
-    printf("pcapfile: %s\n", pcapfile);
-    printf("domainsfile: %s\n", domainsfile);
-    printf("transaltionsfile: %s\n", translationsfile);
-    printf("bool verbose: %d\n", verbose);
+    // printf("interface: %s\n", interface);
+    // printf("pcapfile: %s\n", pcapfile);
+    // printf("domainsfile: %s\n", domainsfile);
+    // printf("transaltionsfile: %s\n", translationsfile);
+    // printf("bool verbose: %d\n", verbose);
 
     pcap_t* handle;
     handle = create_pcap_handle(interface, filter);
