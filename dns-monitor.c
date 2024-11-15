@@ -216,12 +216,12 @@ void remove_duplicate_last_line(FILE *fp) {
     }
 }
 
-int print_domain_name(const u_char *data, const u_char *original_dns_pointer, int number_of_recursions, int data_printed_size, FILE *fp){
+int get_domain_name(const u_char *data, const u_char *original_dns_pointer, int number_of_recursions, int data_printed_size, FILE *fp, char *domain_name, int current_length){
     if ((*data & 0xC0) == 0xC0){
         uint16_t pointer_offset = 0;
         pointer_offset = ((*data & 0x3F) << 8) | *(data + 1);
         number_of_recursions++;
-        return print_domain_name(original_dns_pointer+pointer_offset, original_dns_pointer, number_of_recursions, data_printed_size, fp);
+        return get_domain_name(original_dns_pointer+pointer_offset, original_dns_pointer, number_of_recursions, data_printed_size, fp, domain_name, current_length);
     }
     else{
         uint8_t name_length = *data;
@@ -232,33 +232,26 @@ int print_domain_name(const u_char *data, const u_char *original_dns_pointer, in
             }
 
             for (size_t i = 0; i < name_length; i++) {
-                if(verbose){
-                    printf("%c", *data);
+                if (current_length < 254) {  // 254 because the last byte is for '\0'
+                    domain_name[current_length++] = *data;
+                    domain_name[current_length] = '\0';
                 }
-                if (fp != NULL){
-                    fprintf(fp, "%c", *data);
-                }
-                
                 data ++;
+                
                 if (number_of_recursions == 0){
                     data_printed_size++;
                 }
             }
-            if (verbose){
-                printf(".");
+            if (current_length < 254) {
+                domain_name[current_length++] = '.';
+                domain_name[current_length] = '\0';
             }
-            if (fp != NULL){
-                fprintf(fp, ".");
-            }
-            return print_domain_name(data, original_dns_pointer, number_of_recursions, data_printed_size, fp);
+
+            return get_domain_name(data, original_dns_pointer, number_of_recursions, data_printed_size, fp, domain_name, current_length);
         }
         if (number_of_recursions == 0){
             data_printed_size++;
         }
-    }
-
-    if (fp != NULL){
-        fprintf(fp, "\n");
     }
     return data_printed_size + 2*number_of_recursions;
 }
@@ -273,13 +266,28 @@ int print_domain_name_setup(const u_char *data, const u_char *original_dns_point
         }
     }
     
-    int return_value =  print_domain_name(data, original_dns_pointer, 0, 0, fp);
+    char *domain_name = malloc(255 * sizeof(char));
+    if (domain_name == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return 1;
+    }
+    domain_name[0] = '\0';
 
+    int return_value =  get_domain_name(data, original_dns_pointer, 0, 0, fp, domain_name, 0);
+
+    if (verbose){
+        printf("%s", domain_name);
+    }
     if (fp != NULL){
-        fflush(fp); // Ensure all written data is saved before checking duplicates
+        int length = strlen(domain_name);
+        domain_name[length-1] = '\0';       // remove last dot
+        fprintf(fp, "%s\n", domain_name);
+        fflush(fp);                         // Ensure all written data is saved before checking duplicates
         remove_duplicate_last_line(fp);
         fclose(fp);
     }
+
+    free(domain_name);
     return return_value;
 }
 

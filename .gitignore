@@ -2,5 +2,6 @@
 *.o
 *.out
 *.exe
+*.txt
 
 dns-monitor
