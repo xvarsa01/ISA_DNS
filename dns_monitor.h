@@ -22,6 +22,6 @@
 #include "params.h"
 #include "general_utils.h"
 #include "dns_utils.h"
-
+#include <signal.h>
 
 #endif

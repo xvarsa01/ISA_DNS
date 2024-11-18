@@ -8,6 +8,7 @@
 #include "dns_monitor.h"
 
 global_params params = {false, NULL, NULL, NULL};
+pcap_t *handle;
 
 /*
     Function processes and prints the DNS Question section of the message. The function returns the updated pointer to the data after 
@@ -104,9 +105,6 @@ void print_DNS_data(const u_char *data, int len) {
     }
     
     if (header.qdcount != 0){
-        if (params.verbose){
-            printf("[Question Section]\n");
-        }
         data = print_DNS_question(data, original_dns_pointer);
     }        
     if (header.ancount != 0){
@@ -134,7 +132,7 @@ void print_DNS_data(const u_char *data, int len) {
 */
 pcap_t* create_pcap_handle(char* device, char* filter){
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = NULL;
+    handle = NULL;
     struct bpf_program bpf;
     bpf_u_int32 netmask;
     bpf_u_int32 srcip;
@@ -147,9 +145,16 @@ pcap_t* create_pcap_handle(char* device, char* filter){
     }
 
     // Open the device for live capture.
-    handle = pcap_open_live(device, BUFSIZ, 1, 1000, errbuf);
+
+    if (params.pcapfile == NULL){
+        handle = pcap_open_live(device, BUFSIZ, 1, 1000, errbuf);
+    }
+    else{
+        handle = pcap_open_offline(params.pcapfile, errbuf);
+    }
+
     if (handle == NULL) {
-        fprintf(stderr, "pcap_open_live(): %s\n", errbuf);
+        fprintf(stderr, "pcap_open failed(): %s\n", errbuf);
         return NULL;
     }
 
@@ -267,12 +272,39 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
     print_DNS_data(packetptr + offset, header->len - offset);
 }
 
+/*
+    Actual signal interup
+*/
+void signal_handler() {
+    if (handle) {
+        pcap_breakloop(handle); // Break out of pcap_loop if running
+        pcap_close(handle);    // Close the handle
+        handle = NULL;
+    }
+    exit(EXIT_SUCCESS);
+}
+
+/*
+    Function that is used for setuping of interup signals
+*/
+void setup_signal_handling() {
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sa.sa_flags = 0; // Use default flag behavior
+
+    // Register signals
+    sigaction(SIGTERM, &sa, NULL); // Termination signal
+    sigaction(SIGINT, &sa, NULL);  // Interrupt signal (Ctrl+C)
+    sigaction(SIGQUIT, &sa, NULL); // Quit signal
+}
+
 int main(int argc, char *argv[]){
 
     char *interface = NULL;
     char *filter = "udp port 53";
 
     process_args(argc, argv, &interface, &params.pcapfile, &params.domainsfile, &params.translationsfile, &params.verbose);
+    setup_signal_handling();
 
     pcap_t* handle;
     handle = create_pcap_handle(interface, filter);

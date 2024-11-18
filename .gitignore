@@ -4,5 +4,6 @@
 *.exe
 *.txt
 .vscode
+*.pcap
 
 dns-monitor
