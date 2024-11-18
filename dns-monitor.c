@@ -22,15 +22,7 @@
      ? (bool) (optarg = argv[optind++]) \
      : (optarg != NULL))
 
-struct dns_header
-{
-    uint16_t id;
-    uint16_t flags;
-    uint16_t qdcount;
-    uint16_t ancount;
-    uint16_t nscount;
-    uint16_t arcount;
-};
+
 
 
 bool verbose = false;
@@ -216,6 +208,28 @@ void remove_duplicate_last_line(FILE *fp) {
     }
 }
 
+void remove_last_line(FILE *fp) {
+    char current_line[1024] = {0};
+    long last_line_position = 0;
+    long position_before_last_line = 0;
+
+    // Move to the beginning of the file for reading
+    fseek(fp, 0, SEEK_SET);
+
+    // Find the position of the last line
+    while (fgets(current_line, sizeof(current_line), fp) != NULL) {
+        position_before_last_line = last_line_position;  // Store position before reading new line
+        last_line_position = ftell(fp);  // Store the current position after reading the line
+    }
+
+    // If the file isn't empty, truncate it to remove the last line
+    if (last_line_position > 0) {
+        if (ftruncate(fileno(fp), position_before_last_line) != 0) {
+            fprintf(stderr, "Error removing last line from file\n");
+        }
+    }
+}
+
 int get_domain_name(const u_char *data, const u_char *original_dns_pointer, int number_of_recursions, int data_printed_size, FILE *fp, char *domain_name, int current_length){
     if ((*data & 0xC0) == 0xC0){
         uint16_t pointer_offset = 0;
@@ -256,7 +270,7 @@ int get_domain_name(const u_char *data, const u_char *original_dns_pointer, int 
     return data_printed_size + 2*number_of_recursions;
 }
 
-int print_domain_name_setup(const u_char *data, const u_char *original_dns_pointer){
+int print_domain_name_setup(const u_char *data, const u_char *original_dns_pointer, bool possible_translation){
     FILE *fp = NULL;
     if (domainsfile != NULL){
         fp = fopen(domainsfile, "a+");
@@ -288,7 +302,7 @@ int print_domain_name_setup(const u_char *data, const u_char *original_dns_point
         fclose(fp);
     }
     
-    if(translationsfile != NULL){
+    if(translationsfile != NULL && possible_translation){
         FILE *fp_translations_file = fopen(translationsfile, "a+");
         if (fp_translations_file == NULL){
             fprintf(stderr, "Error oppening file\n");
@@ -335,6 +349,8 @@ void print_ipv6_address(const u_char *data) {
         }
 
         fprintf(fp_translations_file, "%s\n", ipv6_address);
+        fflush(fp_translations_file);                         // Ensure all written data is saved before checking duplicates
+        remove_duplicate_last_line(fp_translations_file);
         fclose(fp_translations_file);
     }
 
@@ -364,6 +380,8 @@ void print_ipv4_address(const u_char *data){
         }
 
         fprintf(fp_translations_file, "%s\n", ipv4_address);
+        fflush(fp_translations_file);                         // Ensure all written data is saved before checking duplicates
+        remove_duplicate_last_line(fp_translations_file);
         fclose(fp_translations_file);
     }
 
@@ -374,7 +392,7 @@ void print_MX(const u_char *data, const u_char *original_dns_pointer){
     uint16_t preference = ntohs(*((uint16_t*)data));
     data += 2;
     printf(" %u ", preference);
-    print_domain_name_setup(data, original_dns_pointer);        // email
+    print_domain_name_setup(data, original_dns_pointer, false);        // email
 }
 
 void print_SRV(const u_char *data, const u_char *original_dns_pointer){
@@ -384,14 +402,14 @@ void print_SRV(const u_char *data, const u_char *original_dns_pointer){
     data += 6;
 
     printf(" %u %u %u ", priority, weight, port);
-    print_domain_name_setup(data, original_dns_pointer);        // email
+    print_domain_name_setup(data, original_dns_pointer, false);        // email
 }
 
 
 void print_SOA(const u_char *data, const u_char *original_dns_pointer){
-    data += print_domain_name_setup(data, original_dns_pointer);        // nameserver
+    data += print_domain_name_setup(data, original_dns_pointer, false);        // nameserver
     printf(" ");
-    data += print_domain_name_setup(data, original_dns_pointer);        // email
+    data += print_domain_name_setup(data, original_dns_pointer, false);        // email
 
     uint32_t serial = ntohl(*((uint32_t*)data));
     uint32_t refresh_interval = ntohl(*((uint32_t*)(data+4)));
@@ -403,15 +421,17 @@ void print_SOA(const u_char *data, const u_char *original_dns_pointer){
 }
 
 void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns_pointer){
+    bool remove_domain_name_from_file = true;
     switch (qtype){
         case 1:                                         //A
             print_ipv4_address(data);
+            remove_domain_name_from_file = false;
             break;
         case 2:                                         // NS
-            print_domain_name_setup(data, original_dns_pointer);
+            print_domain_name_setup(data, original_dns_pointer, false);
             break;
         case 5:                                         // CNAME
-            print_domain_name_setup(data, original_dns_pointer);
+            print_domain_name_setup(data, original_dns_pointer, false);
             break;
         case 15:
             print_MX(data, original_dns_pointer);       // MX
@@ -421,6 +441,7 @@ void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns
             break;
         case 28:                                        // AAAA
             print_ipv6_address(data);
+            remove_domain_name_from_file = false;
             break;
         case 33:
             print_SRV(data, original_dns_pointer);      // SRV
@@ -428,12 +449,23 @@ void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns
         default:
             printf("unknown");
     }
+    
+    // removes last line from file, as it is domain name but without trnaslation following
+    if(translationsfile != NULL && remove_domain_name_from_file){
+        FILE *fp_translations_file = fopen(translationsfile, "a+");
+        if (fp_translations_file == NULL){
+            fprintf(stderr, "Error oppening file\n");
+            return;
+        }
+        remove_last_line(fp_translations_file);
+        fclose(fp_translations_file);
+    }
     printf("\n");
 }
 
 const u_char * print_DNS_question(const u_char *data,  const u_char *original_dns_pointer){
     
-    data += print_domain_name_setup(data, original_dns_pointer);
+    data += print_domain_name_setup(data, original_dns_pointer, false);
 
     if(verbose){
         uint16_t qtype = ntohs(*((uint16_t*)data));
@@ -448,7 +480,7 @@ const u_char * print_DNS_question(const u_char *data,  const u_char *original_dn
 const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_pointer, int count){
     for (int i = 0; i < count; i++) {
         
-        data += print_domain_name_setup(data, original_dns_pointer);
+        data += print_domain_name_setup(data, original_dns_pointer, true);
 
         uint16_t qtype = ntohs(*((uint16_t*)(data + 0)));
         uint16_t qclass = ntohs(*((uint16_t*)(data + 2)));
@@ -479,21 +511,19 @@ const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_p
 
 void print_DNS_data(const u_char *data, int len) {
     (void) len;
-    // int line_length = 16;
-    // int current_char = 0;
-    // while (current_char < len) {
-    //     if (len - current_char < 16) {
-    //         line_length = len - current_char;
-    //     }
-    //     print_line(data, line_length, current_char);
-    //     current_char += 16;
-    // }
-    // printf("end of old print \n");
 
     const u_char *original_dns_pointer = data;
 
-    struct dns_header header;
-
+    struct dns_header
+    {
+        uint16_t id;
+        uint16_t flags;
+        uint16_t qdcount;
+        uint16_t ancount;
+        uint16_t nscount;
+        uint16_t arcount;
+    } header;
+    
     header.id = ntohs(*((uint16_t*)(data + 0)));
     header.flags = ntohs(*((uint16_t*)(data+2)));
     header.qdcount = ntohs(*((uint16_t*)(data + 4)));
@@ -690,17 +720,9 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
 int main(int argc, char *argv[]){
 
     char *interface = NULL;
-
-
     char *filter = "udp port 53";
 
     process_args(argc, argv, &interface, &pcapfile, &domainsfile, &translationsfile, &verbose);
-
-    // printf("interface: %s\n", interface);
-    // printf("pcapfile: %s\n", pcapfile);
-    // printf("domainsfile: %s\n", domainsfile);
-    // printf("transaltionsfile: %s\n", translationsfile);
-    // printf("bool verbose: %d\n", verbose);
 
     pcap_t* handle;
     handle = create_pcap_handle(interface, filter);
