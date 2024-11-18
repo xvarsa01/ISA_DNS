@@ -3,5 +3,6 @@
 *.out
 *.exe
 *.txt
+.vscode
 
 dns-monitor

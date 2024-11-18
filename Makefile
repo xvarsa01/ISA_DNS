@@ -7,7 +7,7 @@ EXECUTABLES = dns-monitor
 all: $(EXECUTABLES)
 
 dns-monitor: $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $< -lpcap
+	$(CC) $(CFLAGS) -o $@ $(SRCS) -lpcap
 
 clean:
 	rm -f $(EXECUTABLES)
