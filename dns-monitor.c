@@ -311,21 +311,17 @@ void print_ipv6_address(const u_char *data) {
         fprintf(stderr, "Memory allocation failed\n");
         return;
     }
-    ipv6_address[0] = '\0';
 
-    for (int i = 0; i < 8; i++) {
-        // Read 2 bytes, treat them as a 16-bit integer in network byte order
-        uint16_t segment = ntohs(*((uint16_t *)(data + i * 2)));
-        
-        // Format the segment as hex and append to the IPv6 address buffer
-        char segment_buffer[6]; // Enough for "xxxx:" or "xxxx"
-        if (i < 7) {
-            snprintf(segment_buffer, sizeof(segment_buffer), "%x:", segment);
-        } else {
-            snprintf(segment_buffer, sizeof(segment_buffer), "%x", segment);
-        }
-        strncat(ipv6_address, segment_buffer, ipv6_address_size - strlen(ipv6_address) - 1);
-    }
+    snprintf(ipv6_address, ipv6_address_size, 
+            "%x:%x:%x:%x:%x:%x:%x:%x",
+            ntohs(*((uint16_t *)(data + 0))),
+            ntohs(*((uint16_t *)(data + 2))),
+            ntohs(*((uint16_t *)(data + 4))),
+            ntohs(*((uint16_t *)(data + 6))),
+            ntohs(*((uint16_t *)(data + 8))),
+            ntohs(*((uint16_t *)(data + 10))),
+            ntohs(*((uint16_t *)(data + 12))),
+            ntohs(*((uint16_t *)(data + 14))));
     
     if (verbose) {
         printf("%s", ipv6_address);
@@ -335,35 +331,43 @@ void print_ipv6_address(const u_char *data) {
         FILE *fp_translations_file = fopen(translationsfile, "a+");
         if (fp_translations_file == NULL){
             fprintf(stderr, "Error oppening file\n");
-            // return -1;
+            return;
         }
 
-        puts("                                                  here AAAA");  
-        fprintf(fp_translations_file, "adress\n");
+        fprintf(fp_translations_file, "%s\n", ipv6_address);
         fclose(fp_translations_file);
     }
 
-    
-    // Free the allocated memory
     free(ipv6_address);
 }
 
 void print_ipv4_address(const u_char *data){
+    size_t ipv4_address_size = 16;
+    char *ipv4_address = (char *)malloc(ipv4_address_size);
+    if (ipv4_address == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return;
+    }
+    
+    snprintf(ipv4_address, ipv4_address_size, "%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
+
     if(verbose){
-        printf("%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
+        printf("%s", ipv4_address);
     }
 
     if(translationsfile != NULL){
         FILE *fp_translations_file = fopen(translationsfile, "a+");
         if (fp_translations_file == NULL){
             fprintf(stderr, "Error oppening file\n");
-            // return -1;
+            free(ipv4_address);
+            return;
         }
 
-        puts("                                                  here A");  
-        fprintf(fp_translations_file, "adress\n");
+        fprintf(fp_translations_file, "%s\n", ipv4_address);
         fclose(fp_translations_file);
     }
+
+    free(ipv4_address);
 }
 
 void print_MX(const u_char *data, const u_char *original_dns_pointer){
@@ -419,7 +423,7 @@ void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns
             print_ipv6_address(data);
             break;
         case 33:
-            print_SRV(data, original_dns_pointer);                            // SRV
+            print_SRV(data, original_dns_pointer);      // SRV
             break;
         default:
             printf("unknown");
