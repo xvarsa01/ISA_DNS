@@ -95,7 +95,7 @@ void process_args(int argc, char *argv[], char **interface, char **pcapfile, cha
     }
 
     if (*interface == NULL && *pcapfile == NULL){
-        fprintf(stderr, "Interface or pcapfile must be specified. TUse -i for list of available interfaces.\n");
+        fprintf(stderr, "Interface or pcapfile must be specified. Use -i for list of available interfaces or specify a file.\n");
         exit(1);
     }
 
@@ -190,4 +190,21 @@ void print_timestamp(){
         printf("%s ", timestamp);
     }
     
+}
+
+/*
+    Function prints the help message for the DNS monitor program, explaining its usage and available parameters.
+*/
+void print_help() {
+    printf(
+        "Program that reads network packets from the input (network interface or PCAP file) and processes DNS protocol messages.\n"
+        "Usage syntax:\n"
+        "./dns-monitor (-i <interface> | -p <pcapfile>) [-v] [-d <domainsfile>] [-t <translationsfile>]\n"
+        "Parameters:\n"
+        "-i <interface>   - The name of the interface on which the program will listen, or\n"
+        "-p <pcapfile>    - The name of the PCAP file to be processed;\n"
+        "-v               - Verbose mode: prints complete details about DNS messages;\n"
+        "-d <domainsfile> - The name of the file containing domain names;\n"
+        "-t <translationsfile> - The name of the file for translating domain names to IP addresses.\n"
+    );
 }

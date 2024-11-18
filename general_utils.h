@@ -17,5 +17,6 @@ void process_args(int argc, char *argv[], char **interface, char **pcapfile, cha
 void remove_duplicate_last_line(FILE *fp);
 void remove_last_line(FILE *fp);
 void print_timestamp();
+void print_help();
 
 #endif
