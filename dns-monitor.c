@@ -278,6 +278,7 @@ int print_domain_name_setup(const u_char *data, const u_char *original_dns_point
     if (verbose){
         printf("%s", domain_name);
     }
+    
     if (fp != NULL){
         int length = strlen(domain_name);
         domain_name[length-1] = '\0';       // remove last dot
@@ -286,44 +287,144 @@ int print_domain_name_setup(const u_char *data, const u_char *original_dns_point
         remove_duplicate_last_line(fp);
         fclose(fp);
     }
+    
+    if(translationsfile != NULL){
+        FILE *fp_translations_file = fopen(translationsfile, "a+");
+        if (fp_translations_file == NULL){
+            fprintf(stderr, "Error oppening file\n");
+            return -1;
+        }
+
+        fprintf(fp_translations_file, "%s ", domain_name);
+        fclose(fp_translations_file);
+    }
 
     free(domain_name);
     return return_value;
 }
 
-void print_ipv6_address(const u_char *data){
+void print_ipv6_address(const u_char *data) {
+    size_t ipv6_address_size = 40;
+    char *ipv6_address = (char *)malloc(ipv6_address_size);
+    
+    if (ipv6_address == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return;
+    }
+    ipv6_address[0] = '\0';
+
     for (int i = 0; i < 8; i++) {
         // Read 2 bytes, treat them as a 16-bit integer in network byte order
         uint16_t segment = ntohs(*((uint16_t *)(data + i * 2)));
-
-        // Print the segment in hexadecimal
-        printf("%x", segment);
-
-        // Print a colon after each segment except the last one
+        
+        // Format the segment as hex and append to the IPv6 address buffer
+        char segment_buffer[6]; // Enough for "xxxx:" or "xxxx"
         if (i < 7) {
-            printf(":");
+            snprintf(segment_buffer, sizeof(segment_buffer), "%x:", segment);
+        } else {
+            snprintf(segment_buffer, sizeof(segment_buffer), "%x", segment);
         }
+        strncat(ipv6_address, segment_buffer, ipv6_address_size - strlen(ipv6_address) - 1);
+    }
+    
+    if (verbose) {
+        printf("%s", ipv6_address);
+    }
+
+    if(translationsfile != NULL){
+        FILE *fp_translations_file = fopen(translationsfile, "a+");
+        if (fp_translations_file == NULL){
+            fprintf(stderr, "Error oppening file\n");
+            // return -1;
+        }
+
+        puts("                                                  here AAAA");  
+        fprintf(fp_translations_file, "adress\n");
+        fclose(fp_translations_file);
+    }
+
+    
+    // Free the allocated memory
+    free(ipv6_address);
+}
+
+void print_ipv4_address(const u_char *data){
+    if(verbose){
+        printf("%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
+    }
+
+    if(translationsfile != NULL){
+        FILE *fp_translations_file = fopen(translationsfile, "a+");
+        if (fp_translations_file == NULL){
+            fprintf(stderr, "Error oppening file\n");
+            // return -1;
+        }
+
+        puts("                                                  here A");  
+        fprintf(fp_translations_file, "adress\n");
+        fclose(fp_translations_file);
     }
 }
 
-const u_char * print_SOA(const u_char *data, const u_char *original_dns_pointer){
+void print_MX(const u_char *data, const u_char *original_dns_pointer){
+    uint16_t preference = ntohs(*((uint16_t*)data));
+    data += 2;
+    printf(" %u ", preference);
+    print_domain_name_setup(data, original_dns_pointer);        // email
+}
+
+void print_SRV(const u_char *data, const u_char *original_dns_pointer){
+    uint16_t priority = ntohs(*((uint16_t*)data));
+    uint16_t weight = ntohs(*((uint16_t*)(data + 2)));
+    uint16_t port = ntohs(*((uint16_t*)(data + 4)));
+    data += 6;
+
+    printf(" %u %u %u ", priority, weight, port);
+    print_domain_name_setup(data, original_dns_pointer);        // email
+}
+
+
+void print_SOA(const u_char *data, const u_char *original_dns_pointer){
     data += print_domain_name_setup(data, original_dns_pointer);        // nameserver
     printf(" ");
-    data += print_domain_name_setup(data, original_dns_pointer);        // enail
+    data += print_domain_name_setup(data, original_dns_pointer);        // email
 
     uint32_t serial = ntohl(*((uint32_t*)data));
-    data += 4;
-    uint32_t refresh_interval = ntohl(*((uint32_t*)data));
-    data += 4;
-    uint32_t retry_interval = ntohl(*((uint32_t*)data));
-    data += 4;
-    uint32_t expire_limit = ntohl(*((uint32_t*)data));
-    data += 4;
-    uint32_t minimum_ttl = ntohl(*((uint32_t*)data));
-    data += 4;
+    uint32_t refresh_interval = ntohl(*((uint32_t*)(data+4)));
+    uint32_t retry_interval = ntohl(*((uint32_t*)(data+8)));
+    uint32_t expire_limit = ntohl(*((uint32_t*)(data+12)));
+    uint32_t minimum_ttl = ntohl(*((uint32_t*)(data+16)));
 
     printf(" %u %u %u %u %u", serial, refresh_interval, retry_interval, expire_limit, minimum_ttl);
-    return data;
+}
+
+void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns_pointer){
+    switch (qtype){
+        case 1:                                         //A
+            print_ipv4_address(data);
+            break;
+        case 2:                                         // NS
+            print_domain_name_setup(data, original_dns_pointer);
+            break;
+        case 5:                                         // CNAME
+            print_domain_name_setup(data, original_dns_pointer);
+            break;
+        case 15:
+            print_MX(data, original_dns_pointer);       // MX
+            break;
+        case 6:                                         // SOA
+            print_SOA(data, original_dns_pointer);
+            break;
+        case 28:                                        // AAAA
+            print_ipv6_address(data);
+            break;
+        case 33:
+            print_SRV(data, original_dns_pointer);                            // SRV
+            break;
+        default:
+            printf("unknown");
+    }
+    printf("\n");
 }
 
 const u_char * print_DNS_question(const u_char *data,  const u_char *original_dns_pointer){
@@ -347,7 +448,7 @@ const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_p
 
         uint16_t qtype = ntohs(*((uint16_t*)(data + 0)));
         uint16_t qclass = ntohs(*((uint16_t*)(data + 2)));
-        uint32_t ttl = ntohs(*((uint16_t*)(data + 4)));
+        uint32_t ttl = ntohl(*((uint32_t*)(data + 4)));
         uint16_t rd_length = ntohs(*((uint16_t*)(data + 8)));
         data+=10;
         
@@ -355,33 +456,8 @@ const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_p
             printf(" %d", ttl);
             print_CLASS_and_TYPE(qclass, qtype);
             printf(" ");
-            switch (qtype){
-                case 1:                            //A
-                    printf("%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
-                    break;
-                case 2:                             // NS
-                    print_domain_name_setup(data, original_dns_pointer);
-                    break;
-                case 5:                             // CNAME
-                    print_domain_name_setup(data, original_dns_pointer);
-                    break;
-                case 15:
-                    printf("MX");
-                    break;
-                case 6:
-                    print_SOA(data, original_dns_pointer);
-                    break;
-                case 28:                            //AAAA
-                    print_ipv6_address(data);
-                    break;
-                case 33:
-                    printf("SRV");
-                    break;
-                default:
-                    printf("unknown");
-            }
-            printf("\n");
         }
+        print_q_type(data, qtype, original_dns_pointer);
         data += rd_length;
 
         // printf("\nnext data:");
