@@ -1,3 +1,10 @@
+/*
+ * Author: Varsányi Adam
+ * Login: xvarsa01
+ * Date: 18.11.2024
+ * Description: Main project structure with main function and all pcap functions.
+ */
+
 #include "dns_monitor.h"
 
 global_params params = {false, NULL, NULL, NULL};

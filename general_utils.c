@@ -1,3 +1,10 @@
+/*
+ * Author: Varsányi Adam
+ * Login: xvarsa01
+ * Date: 18.11.2024
+ * Description: Additional functions, that can be used in other projects as well, and are not specific to DNS packet handling.
+ */
+
 #include "general_utils.h"
 
 // super hack to check if optional arg is present, reference: https://cfengine.com/blog/2021/optional-arguments-with-getopt-long/
@@ -48,7 +55,7 @@ void process_args(int argc, char *argv[], char **interface, char **pcapfile, cha
                 *interface = optarg;
                 break;
             }
-            fprintf(stderr, "Interface not specified.\n");
+            fprintf(stderr, "Interface not specified. Use one of the following options:\n");
             print_interfaces();
             exit(1);
             
@@ -77,14 +84,18 @@ void process_args(int argc, char *argv[], char **interface, char **pcapfile, cha
             fprintf(stderr, "Translationsfile not specified.\n");
             exit(1);
 
+        case 'h':
+            print_help();
+            exit(1);
+
         default:
-            fprintf(stderr, "Unexpected option %c\n", opt);
+            print_help();
             exit (1);
         }
     }
 
     if (*interface == NULL && *pcapfile == NULL){
-        fprintf(stderr, "Interface or pcapfile must be specified\n");
+        fprintf(stderr, "Interface or pcapfile must be specified. TUse -i for list of available interfaces.\n");
         exit(1);
     }
 

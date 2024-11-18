@@ -1,3 +1,10 @@
+/*
+ * Author: Varsányi Adam
+ * Login: xvarsa01
+ * Date: 18.11.2024
+ * Description: Functions responsible for corret formating and printing data esxtracted from DNS packet.
+ */
+
 #include "dns_utils.h"
 
 /*
