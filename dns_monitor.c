@@ -2,9 +2,11 @@
 
 global_params params = {false, NULL, NULL, NULL};
 
-
+/*
+    Function processes and prints the DNS Question section of the message. The function returns the updated pointer to the data after 
+    DNS question section.
+*/
 const u_char * print_DNS_question(const u_char *data,  const u_char *original_dns_pointer){
-    
     data += print_domain_name_setup(data, original_dns_pointer, false);
 
     if(params.verbose){
@@ -17,6 +19,10 @@ const u_char * print_DNS_question(const u_char *data,  const u_char *original_dn
     return data;
 }
 
+/*
+    Function processes and prints the DNS Answer / Authority / Additional section of the message. The function returns the updated
+    pointer to the data after this section.
+*/
 const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_pointer, int count){
     for (int i = 0; i < count; i++) {
         
@@ -35,13 +41,6 @@ const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_p
         }
         print_q_type(data, qtype, original_dns_pointer);
         data += rd_length;
-
-        // printf("\nnext data:");
-        // const u_char *data2 = data;
-        // for (size_t i = 0; i < 5; i++){
-        //     printf("  0x%02X", *data2);
-        //     data2++;
-        // }
     }
     if (params.verbose){
         printf("\n");
@@ -49,6 +48,10 @@ const u_char * print_DNS_answer(const u_char *data, const u_char *original_dns_p
     return data;
 }
 
+/*
+    Function processes and prints the entire DNS message, including the header and all sections: 
+    Question, Answer, Authority, and Additional.
+*/
 void print_DNS_data(const u_char *data, int len) {
     (void) len;
 
@@ -120,7 +123,7 @@ void print_DNS_data(const u_char *data, int len) {
 }
 
 /*
-    function creates a packet capture handle using the specified network device and filter expression.
+    Function creates a packet capture handle using the specified network device and filter expression.
 */
 pcap_t* create_pcap_handle(char* device, char* filter){
     char errbuf[PCAP_ERRBUF_SIZE];
@@ -159,7 +162,7 @@ pcap_t* create_pcap_handle(char* device, char* filter){
 }
 
 /*
-    callback function that is used for printing ipv4 / ipv6 metadata..
+    Callback function that is used for printing ipv4 / ipv6 metadata..
 */
 void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packetptr) {
     (void)args;

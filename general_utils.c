@@ -7,7 +7,9 @@
      : (optarg != NULL))
 
 
-
+/*
+    Function prints a list of available network interfaces with their names, descriptions, and flags.
+*/
 void print_interfaces() {
     pcap_if_t *interfaces;  // Pointer to the list of network interfaces
     char errbuf[PCAP_ERRBUF_SIZE];  // Error buffer
@@ -30,7 +32,10 @@ void print_interfaces() {
     pcap_freealldevs(interfaces);
 }
 
-
+/*
+    Function processes command-line arguments to set the values of interface, pcapfile, domainsfile, 
+    translationsfile, and verbose flag based on user input.
+*/
 void process_args(int argc, char *argv[], char **interface, char **pcapfile, char **domainsfile, char** translationsfile, bool *verbose) {
     int opt;
     while ((opt = getopt(argc, argv, "vi::p:d:t:")) != -1) {
@@ -87,11 +92,10 @@ void process_args(int argc, char *argv[], char **interface, char **pcapfile, cha
         fprintf(stderr, "Can not use Interface AND pcapfile together\n");
         exit(1);
     }
-    
 }
 
 /*
-    function removes last line from given file if this line is already in text above
+    Function removes the last line from the given file if that line is already present earlier in the file.
 */
 void remove_duplicate_last_line(FILE *fp) {
     char last_line[1024] = {0};
@@ -128,7 +132,7 @@ void remove_duplicate_last_line(FILE *fp) {
 }
 
 /*
-    function that always removes last line from file
+     Function removes the last line from a given file.
 */
 void remove_last_line(FILE *fp) {
     char current_line[1024] = {0};
@@ -153,7 +157,7 @@ void remove_last_line(FILE *fp) {
 }
 
 /*
-    function that prints timestamp
+    Function prints the current timestamp in the format "YYYY-MM-DD HH:MM:SS".
 */
 void print_timestamp(){
     time_t now;

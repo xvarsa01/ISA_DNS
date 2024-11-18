@@ -1,5 +1,9 @@
 #include "dns_utils.h"
 
+/*
+    Function extracts and returns the domain name from DNS data
+    Function returns the total number of bytes read.
+*/
 int get_domain_name(const u_char *data, const u_char *original_dns_pointer, int number_of_recursions, int data_printed_size, FILE *fp, char *domain_name, int current_length){
     if ((*data & 0xC0) == 0xC0){
         uint16_t pointer_offset = 0;
@@ -40,6 +44,10 @@ int get_domain_name(const u_char *data, const u_char *original_dns_pointer, int 
     return data_printed_size + 2*number_of_recursions;
 }
 
+/*
+    Function extracts a domain name from DNS data using `get_domain_name` and prints it to stdout and / or saves it to a file.
+    The function also handles translation file output when appropriate.
+*/
 int print_domain_name_setup(const u_char *data, const u_char *original_dns_pointer, bool possible_translation){
     FILE *fp = NULL;
     if (params.domainsfile != NULL){
@@ -87,6 +95,10 @@ int print_domain_name_setup(const u_char *data, const u_char *original_dns_point
     return return_value;
 }
 
+/*
+    Function prints an IPv6 address from the raw byte data in usual format:"xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx". 
+    The function also appends the IPv6 address to a translations file if specified, and optionally prints it in verbose mode.
+*/
 void print_ipv6_address(const u_char *data) {
     size_t ipv6_address_size = 40;
     char *ipv6_address = (char *)malloc(ipv6_address_size);
@@ -127,6 +139,10 @@ void print_ipv6_address(const u_char *data) {
     free(ipv6_address);
 }
 
+/*
+    Function prints an IPv4 address from the raw byte data in usual format:"x.x.x.x". 
+    The function also appends the IPv6 address to a translations file if specified, and optionally prints it in verbose mode.
+*/
 void print_ipv4_address(const u_char *data){
     size_t ipv4_address_size = 16;
     char *ipv4_address = (char *)malloc(ipv4_address_size);
@@ -158,6 +174,9 @@ void print_ipv4_address(const u_char *data){
     free(ipv4_address);
 }
 
+/*
+    Function prints the Mail Exchange (MX) record from DNS data.
+*/
 void print_MX(const u_char *data, const u_char *original_dns_pointer){
     uint16_t preference = ntohs(*((uint16_t*)data));
     data += 2;
@@ -165,6 +184,9 @@ void print_MX(const u_char *data, const u_char *original_dns_pointer){
     print_domain_name_setup(data, original_dns_pointer, false);        // email
 }
 
+/*
+    Function prints the Service (SRV) record from DNS data.
+*/
 void print_SRV(const u_char *data, const u_char *original_dns_pointer){
     uint16_t priority = ntohs(*((uint16_t*)data));
     uint16_t weight = ntohs(*((uint16_t*)(data + 2)));
@@ -175,6 +197,9 @@ void print_SRV(const u_char *data, const u_char *original_dns_pointer){
     print_domain_name_setup(data, original_dns_pointer, false);        // email
 }
 
+/*
+    Function prints the Start of Authority (SOA) record from DNS data.
+*/
 void print_SOA(const u_char *data, const u_char *original_dns_pointer){
     data += print_domain_name_setup(data, original_dns_pointer, false);        // nameserver
     if (params.verbose){
@@ -193,6 +218,9 @@ void print_SOA(const u_char *data, const u_char *original_dns_pointer){
     }
 }
 
+/*
+    Function processes and prints the DNS query type record based on the specified query type.
+*/
 void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns_pointer){
     bool remove_domain_name_from_file = true;
     switch (qtype){
@@ -238,6 +266,9 @@ void print_q_type(const u_char *data, uint16_t qtype, const u_char *original_dns
     }
 }
 
+/*
+    Function prints the DNS record class and query type.
+*/
 void print_CLASS_and_TYPE(uint16_t qclass, uint16_t qtype){
     switch (qclass){
     case 1:
